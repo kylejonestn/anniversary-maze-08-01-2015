@@ -4,9 +4,9 @@
 <title>The Labyrinth</title>
 <meta charset="UTF-8">
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-<script src="https://unpkg.com/aframe-environment-component@1.3.3/dist/aframe-environment-component.min.js"></script>
 <style>
     body { margin: 0; }
+    .a-canvas { cursor: crosshair !important; } /* Changes mouse cursor for a better feel */
     #terminal-screen {
         position: fixed;
         top: 0; left: 0; right: 0; bottom: 0;
@@ -50,23 +50,37 @@
 <div id="terminal-screen">
     </div>
 
-<a-scene environment="preset: tron; groundColor: #444; grid: none;">
+<a-scene background="color: #111111">
     
-    <a-entity id="player" position="1.5 1.6 1.5"
+    <a-entity light="type: ambient; color: #222"></a-entity>
+
+    <a-entity id="player" position="6 1.6 6"
               camera
               look-controls
-              wasd-controls="acceleration: 60; fly: false">
+              wasd-controls="acceleration: 120; fly: false">
+        <a-light type="spot"
+                 angle="40"
+                 penumbra="0.4"
+                 intensity="2.0"
+                 distance="25"
+                 target="#player-target">
+        </a-light>
+        <a-entity id="player-target" position="0 0 -1"></a-entity>
     </a-entity>
 
     <a-entity id="maze"></a-entity>
+
+    <a-plane position="0 0 0" rotation="-90 0 0" width="100" height="100" color="#333" material="roughness: 1"></a-plane>
     
 </a-scene>
 
 <script>
     const mazeContainer = document.getElementById('maze');
     const terminalScreen = document.getElementById('terminal-screen');
-    const WALL_HEIGHT = 3;
-    const WALL_THICKNESS = 0.2;
+    
+    // --- New variable to control maze scale ---
+    const SCALE = 4;
+    const WALL_HEIGHT = 5;
 
     const mazeMap = [
         [1, 1, 1, 1, 1, 1, 1],
@@ -81,27 +95,29 @@
     function createMaze() {
         mazeMap.forEach((row, z) => {
             row.forEach((cell, x) => {
+                const worldX = x * SCALE;
+                const worldZ = z * SCALE;
+
                 if (cell === 1) {
                     const wall = document.createElement('a-box');
-                    wall.setAttribute('position', `${x} ${WALL_HEIGHT / 2} ${z}`);
-                    wall.setAttribute('depth', 1);
-                    wall.setAttribute('width', 1);
+                    wall.setAttribute('position', `${worldX} ${WALL_HEIGHT / 2} ${worldZ}`);
+                    wall.setAttribute('depth', SCALE);
+                    wall.setAttribute('width', SCALE);
                     wall.setAttribute('height', WALL_HEIGHT);
-                    wall.setAttribute('color', '#555');
-                    wall.setAttribute('material', 'roughness: 0.8; metalness: 0.5');
-                    wall.setAttribute('static-body', ''); // For physics
+                    wall.setAttribute('color', '#404040');
+                    wall.setAttribute('material', 'roughness: 0.8; metalness: 0.2');
+                    wall.setAttribute('static-body', '');
                     mazeContainer.appendChild(wall);
                 } else if (cell === 'E') {
                     // Padlock visual
                     const padlockBase = document.createElement('a-box');
-                    padlockBase.setAttribute('position', `${x} 1.2 0.45`);
-                    padlockBase.setAttribute('scale', '0.6 0.5 0.1');
+                    padlockBase.setAttribute('position', `${worldX} 2.0 ${worldZ - (SCALE / 2) + 0.1}`);
+                    padlockBase.setAttribute('scale', `${SCALE * 0.6} ${SCALE * 0.5} 0.2`);
                     padlockBase.setAttribute('color', '#FFC107');
                     
                     const padlockTop = document.createElement('a-torus');
-                    padlockTop.setAttribute('position', `${x} 1.6 0.45`);
-                    padlockTop.setAttribute('scale', '0.2 0.2 0.2');
-                    padlockTop.setAttribute('radius', '0.5');
+                    padlockTop.setAttribute('position', `${worldX} 2.8 ${worldZ - (SCALE / 2) + 0.1}`);
+                    padlockTop.setAttribute('radius', `${SCALE * 0.2}`);
                     padlockTop.setAttribute('radius-tubular', '0.1');
                     padlockTop.setAttribute('arc', '180');
                     padlockTop.setAttribute('rotation', '0 0 180');
@@ -112,12 +128,12 @@
                     
                     // Invisible Trigger Box
                     const trigger = document.createElement('a-box');
-                    trigger.setAttribute('position', `${x} 1.5 ${z-0.5}`);
-                    trigger.setAttribute('width', '1');
-                    trigger.setAttribute('height', '3');
-                    trigger.setAttribute('depth', '0.2');
+                    trigger.setAttribute('position', `${worldX} 1.5 ${worldZ - SCALE}`);
+                    trigger.setAttribute('width', SCALE);
+                    trigger.setAttribute('height', WALL_HEIGHT);
+                    trigger.setAttribute('depth', '0.5');
                     trigger.setAttribute('visible', 'false');
-                    trigger.setAttribute('end-trigger', ''); // Custom component
+                    trigger.setAttribute('end-trigger', '');
                     mazeContainer.appendChild(trigger);
                 }
             });
@@ -133,11 +149,11 @@
         tick: function () {
             if (this.triggered) return;
 
-            const playerPos = this.player.getAttribute('position');
-            const triggerPos = this.el.getAttribute('position');
+            const playerPos = this.player.object3D.position;
+            const triggerPos = this.el.object3D.position;
             const distance = playerPos.distanceTo(triggerPos);
 
-            if (distance < 1.5) {
+            if (distance < (SCALE / 2)) {
                 this.triggered = true;
                 triggerTerminal();
             }
@@ -145,11 +161,10 @@
     });
 
     function triggerTerminal() {
-        // Disable player movement
         const playerEl = document.querySelector('#player');
-        playerEl.removeAttribute('wasd-controls');
-        playerEl.removeAttribute('look-controls');
-
+        if (playerEl.components['look-controls']) playerEl.components['look-controls'].pause();
+        if (playerEl.components['wasd-controls']) playerEl.components['wasd-controls'].pause();
+        
         terminalScreen.style.display = 'flex';
         terminalScreen.innerHTML = `
             <div class="terminal-box">
@@ -183,7 +198,7 @@
            }
         }
     }
-
+    
     createMaze();
 </script>
 
