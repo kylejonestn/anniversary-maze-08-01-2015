@@ -75,6 +75,34 @@
     }
     .terminal-box input { width: 80%; padding: 10px; margin-bottom: 10px; background: #000; color: lime; border: 1px solid lime; text-transform: uppercase; }
     .terminal-box button { padding: 10px 20px; background: lime; color: #000; border: none; cursor: pointer; }
+    
+    /* Style for the new chat link button */
+    #chat-link-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 15px 25px;
+        margin-top: 20px;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 1.2rem;
+        color: lime;
+        background-color: transparent;
+        border: 2px solid lime;
+        border-radius: 5px;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+    #chat-link-btn:hover {
+        background-color: lime;
+        color: #000;
+    }
+    #chat-link-btn svg {
+        width: 24px;
+        height: 24px;
+        margin-right: 10px;
+        fill: currentColor;
+    }
+
     #keyboard-hints {
         position: fixed;
         bottom: 20px;
@@ -104,9 +132,8 @@
     const terminalScreen = document.getElementById('terminal-screen');
     const keyboardHints = document.getElementById('keyboard-hints');
 
-    const TILE_SIZE = 200; // The size of each square tile in pixels
+    const TILE_SIZE = 200;
 
-    // 1 = Wall, 0 = Path, 'S' = Start, 'E' = End-zone
     const mazeMap = [
         [1, 1, 1, 1, 1, 1, 1],
         [1, 'S', 0, 1, 0, 0, 1],
@@ -117,7 +144,7 @@
         [1, 1, 1, 1, 1, 1, 1]
     ];
 
-    const player = { x: 1, y: 1, rot: 0 }; // rot is degrees
+    const player = { x: 1, y: 1, rot: 0 };
 
     function getStartPosition() {
         for (let y = 0; y < mazeMap.length; y++) {
@@ -156,11 +183,10 @@
                     const wallX = x * TILE_SIZE;
                     const wallY = 0;
                     const wallZ = y * TILE_SIZE;
-                    // Create a cube of wall faces
-                    world.appendChild(createFace(TILE_SIZE, wallHeight, wallX, wallY, wallZ - TILE_SIZE / 2, 0, 0, 0)); // Front
-                    world.appendChild(createFace(TILE_SIZE, wallHeight, wallX, wallY, wallZ + TILE_SIZE / 2, 0, 180, 0)); // Back
-                    world.appendChild(createFace(TILE_SIZE, wallHeight, wallX - TILE_SIZE / 2, wallY, wallZ, 0, 90, 0)); // Left
-                    world.appendChild(createFace(TILE_SIZE, wallHeight, wallX + TILE_SIZE / 2, wallY, wallZ, 0, -90, 0)); // Right
+                    world.appendChild(createFace(TILE_SIZE, wallHeight, wallX, wallY, wallZ - TILE_SIZE / 2, 0, 0, 0));
+                    world.appendChild(createFace(TILE_SIZE, wallHeight, wallX, wallY, wallZ + TILE_SIZE / 2, 0, 180, 0));
+                    world.appendChild(createFace(TILE_SIZE, wallHeight, wallX - TILE_SIZE / 2, wallY, wallZ, 0, 90, 0));
+                    world.appendChild(createFace(TILE_SIZE, wallHeight, wallX + TILE_SIZE / 2, wallY, wallZ, 0, -90, 0));
                 }
                 if (mazeMap[y][x] === 'E') {
                     const padlock = document.createElement('div');
@@ -182,29 +208,18 @@
     function handleKeyPress(e) {
         let dx = 0, dy = 0;
         const angle = player.rot * Math.PI / 180;
-
-        if (e.key === 'ArrowUp') {
-            dx = Math.sin(angle);
-            dy = -Math.cos(angle);
-        } else if (e.key === 'ArrowDown') {
-            dx = -Math.sin(angle);
-            dy = Math.cos(angle);
-        } else if (e.key === 'ArrowLeft') {
-            player.rot = (player.rot - 90 + 360) % 360;
-        } else if (e.key === 'ArrowRight') {
-            player.rot = (player.rot + 90) % 360;
-        }
+        if (e.key === 'ArrowUp') { dx = Math.sin(angle); dy = -Math.cos(angle); } 
+        else if (e.key === 'ArrowDown') { dx = -Math.sin(angle); dy = Math.cos(angle); } 
+        else if (e.key === 'ArrowLeft') { player.rot = (player.rot - 90 + 360) % 360; } 
+        else if (e.key === 'ArrowRight') { player.rot = (player.rot + 90) % 360; }
 
         if (dx !== 0 || dy !== 0) {
             const nextX = Math.round(player.x + dx);
             const nextY = Math.round(player.y + dy);
-
             if (mazeMap[nextY] && mazeMap[nextY][nextX] !== 1) {
                 player.x = nextX;
                 player.y = nextY;
-                if (mazeMap[nextY][nextX] === 'E') {
-                    triggerTerminal();
-                }
+                if (mazeMap[nextY][nextX] === 'E') { triggerTerminal(); }
             }
         }
         updateWorldTransform();
@@ -215,10 +230,9 @@
         terminalScreen.innerHTML = `
             <div class="terminal-box">
                 <h3>SYSTEM TERMINAL</h3><p>PASSWORD REQUIRED</p>
-                <input type="text" id="password" placeholder="PASSWORD...">
+                <input type="text" id="password" placeholder="PASSWORD..." autofocus>
                 <button id="unlockBtn">UNLOCK</button>
             </div>`;
-        document.getElementById('password').focus();
         document.getElementById('unlockBtn').onclick = checkPassword;
         document.getElementById('password').onkeyup = (e) => { if(e.key === 'Enter') checkPassword(); };
     }
@@ -229,25 +243,29 @@
             terminalScreen.innerHTML = `
             <div class="terminal-box">
                 <h2>ACCESS GRANTED</h2>
-                <p>I'm thinking of a character. You'll have to guess who I am before I help you further. Scan here to play my game.</p>
-                <img src="chatbot_qr.png" alt="QR Code to Chatbot" style="width: 200px; height: 200px; margin-top: 15px; border: 5px solid white;">
-            </div>`;
+                <p>I'm thinking of a character. You'll have to guess who I am before I help you further.</p>
+                
+                <a href="https://gemini.google.com/gem/9dc507686e22" target="_blank" id="chat-link-btn">
+                    <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path></svg>
+                    <span>Chat for next clue</span>
+                </a>
+                </div>`;
         } else {
            alert('ACCESS DENIED');
-           document.getElementById('password').value = '';
-           document.getElementById('password').focus();
+           const passField = document.getElementById('password');
+           if(passField) {
+               passField.value = '';
+               passField.focus();
+           }
         }
     }
     
-    // Hide keyboard hints after 20 seconds
     setTimeout(() => { keyboardHints.style.opacity = '0'; }, 20000);
 
-    // Initial setup
     getStartPosition();
     createMaze();
     updateWorldTransform();
     window.addEventListener('keydown', handleKeyPress);
-
 </script>
 </body>
 </html>
