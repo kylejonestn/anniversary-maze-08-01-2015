@@ -30,6 +30,7 @@
         perspective: 800px;
         border: 2px solid #666;
         background-color: #111;
+        position: relative;
     }
     #camera {
         width: 100%;
@@ -53,29 +54,43 @@
     }
     .floor { transform: rotateX(90deg) translateZ(-300px); width: 800px; height: 1000px; background-color: var(--floor-color); }
     .ceiling { transform: rotateX(-90deg) translateZ(-300px); width: 800px; height: 1000px; background-color: var(--ceiling-color); }
-    .left { transform: rotateY(-90deg) translateZ(-400px); width: 1000px; height: 600px; background-color: var(--wall-color); }
-    .right { transform: rotateY(90deg) translateZ(-400px); width: 1000px; height: 600px; background-color: var(--wall-color); }
-    .back { transform: translateZ(-1000px); width: 800px; height: 600px; }
-
-    #terminal-screen {
+    .left { transform: rotateY(-90deg) translateZ(-400px); width: 1000px; height: 600px; }
+    .right { transform: rotateY(90deg) translateZ(-400px); width: 1000px; height: 600px; }
+    
+    #terminal-screen, #success-screen {
         position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
+        top: 0; left: 0; right: 0; bottom: 0;
+        display: none; /* Hidden by default */
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background-color: rgba(0,0,0,0.8);
+    }
+    .terminal-box {
         width: 400px;
         padding: 20px;
-        background: rgba(0,20,0,0.8);
+        background: rgba(0,20,0,0.9);
         border: 2px solid lime;
         border-radius: 5px;
         text-align: center;
-        display: none; /* Hidden by default */
     }
-    #terminal-screen input { width: 80%; padding: 10px; margin-bottom: 10px; background: #000; color: lime; border: 1px solid lime; }
-    #terminal-screen button { padding: 10px 20px; background: lime; color: #000; border: none; cursor: pointer; }
-    #success-screen { text-align: center; display: none; }
+    .terminal-box input { width: 80%; padding: 10px; margin-bottom: 10px; background: #000; color: lime; border: 1px solid lime; text-transform: uppercase; }
+    .terminal-box button { padding: 10px 20px; background: lime; color: #000; border: none; cursor: pointer; }
+    #success-screen .terminal-box { background: rgba(20,0,0,0.9); border-color: #f85149; }
     #success-screen img { width: 200px; height: 200px; margin-top: 15px; border: 5px solid white; }
+
     #controls { margin-top: 20px; }
-    button { font-family: 'Courier New', Courier, monospace; font-size: 16px; padding: 10px 15px; margin: 0 5px; background: #333; color: #fff; border: 1px solid #666; cursor: pointer; }
+    #controls button { font-family: 'Courier New', Courier, monospace; font-size: 16px; padding: 10px 15px; margin: 0 5px; background: #333; color: #fff; border: 1px solid #666; cursor: pointer; }
+    
+    #keyboard-hints {
+        position: absolute;
+        bottom: 100px;
+        background-color: rgba(0,0,0,0.7);
+        padding: 10px 20px;
+        border-radius: 5px;
+        border: 1px solid #444;
+        transition: opacity 1s ease-out;
+    }
 </style>
 </head>
 <body>
@@ -83,24 +98,32 @@
 <div id="viewport">
     <div id="camera">
         </div>
+    <div id="terminal-screen">
+        <div class="terminal-box">
+            <h3>SYSTEM TERMINAL</h3>
+            <p>PASSWORD REQUIRED</p>
+            <input type="text" id="password" placeholder="PASSWORD..." onkeyup="if(event.key === 'Enter') checkPassword();">
+            <button onclick="checkPassword()">UNLOCK</button>
+        </div>
+    </div>
+    <div id="success-screen">
+        <div class="terminal-box">
+            <h2>ACCESS GRANTED</h2>
+            <p>I'm thinking of a character. You'll have to guess who I am before I help you further. Scan here to play my game.</p>
+            <img src="chatbot_qr.png" alt="QR Code to Chatbot">
+        </div>
+    </div>
 </div>
+
 <div id="controls">
     <button onclick="move('forward')">Forward</button>
+    <button onclick="move('backward')">Backward</button>
     <button onclick="turn('left')">Turn Left</button>
     <button onclick="turn('right')">Turn Right</button>
 </div>
 
-<div id="terminal-screen">
-    <h3>SYSTEM TERMINAL</h3>
-    <p>PASSWORD REQUIRED</p>
-    <input type="text" id="password" placeholder="PASSWORD..." onkeyup="if(event.key === 'Enter') checkPassword();">
-    <button onclick="checkPassword()">UNLOCK</button>
-</div>
-
-<div id="success-screen">
-    <h2>ACCESS GRANTED</h2>
-    <p>I'm thinking of a character. You'll have to guess who I am before I help you further. Scan here to play my game.</p>
-    <img src="chatbot_qr.png" alt="QR Code to Chatbot">
+<div id="keyboard-hints">
+    Use Arrow Keys: ↑ Forward, ↓ Backward, ← Turn Left, → Turn Right
 </div>
 
 <script>
@@ -108,61 +131,53 @@
     const controls = document.getElementById('controls');
     const terminalScreen = document.getElementById('terminal-screen');
     const successScreen = document.getElementById('success-screen');
-    
-    // Maze Layout: 0 = path, 1 = wall, 'E' = end
-    const mazeLayout = [
-        [0, 0, 1, 'E'],
-        [1, 0, 1, 0],
-        [1, 0, 0, 0],
-        [1, 1, 1, 0]
-    ];
-    let playerPos = { x: 0, z: 0 };
-    let playerRotation = 0; // 0: North, 90: East, 180: South, 270: West
+    const keyboardHints = document.getElementById('keyboard-hints');
+
+    let playerRotation = 0;
+    let currentZ = 0;
+    const segmentLength = 1050;
+    const mazeLength = 5; // Number of segments
 
     function createWorld() {
-        // This is a simplified maze generator for a straight path with turns
-        // A more complex generator would be needed for the layout above
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < mazeLength; i++) {
             let tunnel = document.createElement('div');
             tunnel.className = 'tunnel';
-            tunnel.style.transform = `translateZ(${-i * 1000}px)`;
+            tunnel.style.transform = `translateZ(${-i * (segmentLength - 50)}px)`;
             tunnel.innerHTML = `
                 <div class="wall floor"></div>
                 <div class="wall ceiling"></div>
                 <div class="wall left"></div>
                 <div class="wall right"></div>
             `;
-            // Add turns
-            if (i === 1) tunnel.querySelector('.right').style.display = 'none'; // Opening on the right
-            if (i === 2) {
-                 tunnel.querySelector('.left').style.display = 'none'; // Opening on the left
-                 tunnel.querySelector('.back').className += ' wall';
-            }
-            if (i === 3) tunnel.querySelector('.right').style.display = 'none';
             camera.appendChild(tunnel);
         }
     }
-    
-    let currentZ = 0;
-    
+
     function move(direction) {
         if (direction === 'forward') {
-            // This is a simplified "on-rails" movement
-            currentZ -= 1050; // Move forward one segment
-            if (currentZ < -4000) { // End of the maze
-                controls.style.display = 'none';
-                terminalScreen.style.display = 'block';
+            if (currentZ > -(segmentLength * (mazeLength - 1))) {
+                currentZ -= segmentLength;
             }
+        } else if (direction === 'backward') {
+            if (currentZ < 0) {
+                currentZ += segmentLength;
+            }
+        }
+        
+        if (currentZ <= -(segmentLength * (mazeLength - 1))) {
+            controls.style.display = 'none';
+            keyboardHints.style.display = 'none';
+            terminalScreen.style.display = 'flex';
         }
         updateCamera();
     }
-    
+
     function turn(direction) {
         if (direction === 'left') playerRotation -= 90;
         if (direction === 'right') playerRotation += 90;
         updateCamera();
     }
-    
+
     function updateCamera() {
         camera.style.transform = `translateZ(${currentZ}px) rotateY(${playerRotation}deg)`;
     }
@@ -170,15 +185,32 @@
     function checkPassword() {
         const password = document.getElementById('password').value;
         if (password.trim().toLowerCase() === 'verge') {
-            document.getElementById('viewport').style.display = 'none';
             terminalScreen.style.display = 'none';
-            successScreen.style.display = 'block';
+            successScreen.style.display = 'flex';
         } else {
             alert('ACCESS DENIED');
+            document.getElementById('password').value = '';
         }
     }
-    
+
+    function handleKeyPress(event) {
+        switch(event.key) {
+            case 'ArrowUp': move('forward'); break;
+            case 'ArrowDown': move('backward'); break;
+            case 'ArrowLeft': turn('left'); break;
+            case 'ArrowRight': turn('right'); break;
+        }
+    }
+
+    // Initial setup
     createWorld();
+    window.addEventListener('keydown', handleKeyPress);
+    
+    // Hide keyboard hints after 20 seconds
+    setTimeout(() => {
+        keyboardHints.style.opacity = '0';
+    }, 20000);
+
 </script>
 
 </body>
