@@ -6,7 +6,7 @@
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <style>
     body { margin: 0; }
-    .a-canvas { cursor: crosshair !important; } /* Changes mouse cursor for a better feel */
+    .a-canvas { cursor: crosshair !important; }
     #terminal-screen {
         position: fixed;
         top: 0; left: 0; right: 0; bottom: 0;
@@ -43,6 +43,19 @@
     }
     #chat-link-btn:hover { background-color: lime; color: #000; }
     #chat-link-btn svg { width: 24px; height: 24px; margin-right: 10px; fill: currentColor; }
+    .hints {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: rgba(0,0,0,0.7);
+        padding: 10px 20px;
+        border-radius: 5px;
+        border: 1px solid #444;
+        transition: opacity 1s ease-out 1s;
+        display: none; /* Hidden by default */
+        z-index: 10;
+    }
 </style>
 </head>
 <body>
@@ -50,26 +63,21 @@
 <div id="terminal-screen">
     </div>
 
+<div id="keyboard-hints" class="hints">Use WASD or Arrow Keys to Move | Use Mouse to Look</div>
+<div id="touch-hints" class="hints">Tap Top Half to Move Forward | Tap Bottom Half to Move Backward</div>
+
 <a-scene background="color: #111111">
     
     <a-entity light="type: ambient; color: #222"></a-entity>
 
     <a-entity id="player" position="6 1.6 6"
               camera
-              look-controls
+              look-controls="touchEnabled: true"
               wasd-controls="acceleration: 120; fly: false">
-        <a-light type="spot"
-                 angle="40"
-                 penumbra="0.4"
-                 intensity="2.0"
-                 distance="25"
-                 target="#player-target">
-        </a-light>
-        <a-entity id="player-target" position="0 0 -1"></a-entity>
+        <a-light type="spot" angle="40" penumbra="0.4" intensity="2.0" distance="25"></a-light>
     </a-entity>
 
     <a-entity id="maze"></a-entity>
-
     <a-plane position="0 0 0" rotation="-90 0 0" width="100" height="100" color="#333" material="roughness: 1"></a-plane>
     
 </a-scene>
@@ -77,8 +85,9 @@
 <script>
     const mazeContainer = document.getElementById('maze');
     const terminalScreen = document.getElementById('terminal-screen');
+    const playerEl = document.querySelector('#player');
+    const sceneEl = document.querySelector('a-scene');
     
-    // --- New variable to control maze scale ---
     const SCALE = 4;
     const WALL_HEIGHT = 5;
 
@@ -91,6 +100,32 @@
         [1, 0, 0, 0, 1, 'E', 1],
         [1, 1, 1, 1, 1, 1, 1]
     ];
+    let isMoving = false;
+    let moveDirection = 0; // 1 for forward, -1 for backward
+
+    // --- A-FRAME COMPONENT FOR TOUCH MOVEMENT ---
+    AFRAME.registerComponent('touch-mover', {
+        tick: function(time, timeDelta) {
+            if (!isMoving) return;
+            
+            const direction = this.el.object3D.getWorldDirection(new THREE.Vector3());
+            const speed = 0.005 * timeDelta * moveDirection;
+            
+            const currentPosition = this.el.getAttribute('position');
+            const newPosition = {
+                x: currentPosition.x + direction.x * speed,
+                y: currentPosition.y,
+                z: currentPosition.z + direction.z * speed
+            };
+            
+            // Basic collision detection check (simplified)
+            const nextX = Math.round(newPosition.x / SCALE);
+            const nextZ = Math.round(newPosition.z / SCALE);
+            if (mazeMap[nextZ] && mazeMap[nextZ][nextX] !== 1) {
+                 this.el.setAttribute('position', newPosition);
+            }
+        }
+    });
 
     function createMaze() {
         mazeMap.forEach((row, z) => {
@@ -104,12 +139,11 @@
                     wall.setAttribute('depth', SCALE);
                     wall.setAttribute('width', SCALE);
                     wall.setAttribute('height', WALL_HEIGHT);
-                    wall.setAttribute('color', '#404040');
+                    // --- Wall color changed to dark blue ---
+                    wall.setAttribute('color', '#0D47A1');
                     wall.setAttribute('material', 'roughness: 0.8; metalness: 0.2');
-                    wall.setAttribute('static-body', '');
                     mazeContainer.appendChild(wall);
                 } else if (cell === 'E') {
-                    // Padlock visual
                     const padlockBase = document.createElement('a-box');
                     padlockBase.setAttribute('position', `${worldX} 2.0 ${worldZ - (SCALE / 2) + 0.1}`);
                     padlockBase.setAttribute('scale', `${SCALE * 0.6} ${SCALE * 0.5} 0.2`);
@@ -126,7 +160,6 @@
                     mazeContainer.appendChild(padlockBase);
                     mazeContainer.appendChild(padlockTop);
                     
-                    // Invisible Trigger Box
                     const trigger = document.createElement('a-box');
                     trigger.setAttribute('position', `${worldX} 1.5 ${worldZ - SCALE}`);
                     trigger.setAttribute('width', SCALE);
@@ -140,20 +173,13 @@
         });
     }
 
-    // A-Frame component to detect player entering the trigger box
     AFRAME.registerComponent('end-trigger', {
-        init: function () {
-            this.player = document.querySelector('#player');
-            this.triggered = false;
-        },
+        init: function () { this.triggered = false; },
         tick: function () {
             if (this.triggered) return;
-
-            const playerPos = this.player.object3D.position;
+            const playerPos = playerEl.object3D.position;
             const triggerPos = this.el.object3D.position;
-            const distance = playerPos.distanceTo(triggerPos);
-
-            if (distance < (SCALE / 2)) {
+            if (playerPos.distanceTo(triggerPos) < (SCALE / 2)) {
                 this.triggered = true;
                 triggerTerminal();
             }
@@ -161,18 +187,12 @@
     });
 
     function triggerTerminal() {
-        const playerEl = document.querySelector('#player');
         if (playerEl.components['look-controls']) playerEl.components['look-controls'].pause();
         if (playerEl.components['wasd-controls']) playerEl.components['wasd-controls'].pause();
+        isMoving = false;
         
         terminalScreen.style.display = 'flex';
-        terminalScreen.innerHTML = `
-            <div class="terminal-box">
-                <h3>SYSTEM TERMINAL</h3><p>PASSWORD REQUIRED</p>
-                <input type="text" id="password" autofocus>
-                <button id="unlockBtn">UNLOCK</button>
-            </div>`;
-
+        terminalScreen.innerHTML = `<div class="terminal-box"><h3>SYSTEM TERMINAL</h3><p>PASSWORD REQUIRED</p><input type="text" id="password" autofocus><button id="unlockBtn">UNLOCK</button></div>`;
         const passwordInput = document.getElementById('password');
         document.getElementById('unlockBtn').onclick = () => checkPassword(passwordInput.value);
         passwordInput.onkeyup = (e) => { if (e.key === 'Enter') checkPassword(passwordInput.value); };
@@ -180,27 +200,46 @@
 
     function checkPassword(pass) {
         if (pass.trim().toLowerCase() === 'verge') {
-            terminalScreen.innerHTML = `
-            <div class="terminal-box">
-                <h2>ACCESS GRANTED</h2>
-                <p>I'm thinking of a character. You'll have to guess who I am before I help you further.</p>
-                <a href="https://gemini.google.com/gem/9dc507686e22" target="_blank" id="chat-link-btn">
-                    <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path></svg>
-                    <span>Chat for next clue</span>
-                </a>
-            </div>`;
+            terminalScreen.innerHTML = `<div class="terminal-box"><h2>ACCESS GRANTED</h2><p>I'm thinking of a character. You'll have to guess who I am before I help you further.</p><a href="https://gemini.google.com/gem/9dc507686e22" target="_blank" id="chat-link-btn"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path></svg><span>Chat for next clue</span></a></div>`;
         } else {
            alert('ACCESS DENIED');
            const passwordInput = document.getElementById('password');
-           if (passwordInput) {
-               passwordInput.value = '';
-               passwordInput.focus();
-           }
+           if (passwordInput) { passwordInput.value = ''; passwordInput.focus(); }
+        }
+    }
+    
+    // --- DEVICE AND CONTROL DETECTION ---
+    function setupControls() {
+        const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        const keyboardHints = document.getElementById('keyboard-hints');
+        const touchHints = document.getElementById('touch-hints');
+        
+        if (isTouch) {
+            playerEl.removeAttribute('wasd-controls'); // Disable keyboard controls
+            playerEl.setAttribute('touch-mover', ''); // Enable custom touch controls
+            touchHints.style.display = 'block';
+            setTimeout(() => { touchHints.style.opacity = '0'; }, 5000); // Fade out hint
+
+            sceneEl.addEventListener('touchstart', (e) => {
+                isMoving = true;
+                if (e.touches[0].clientY < window.innerHeight / 2) {
+                    moveDirection = 1; // Forward
+                } else {
+                    moveDirection = -1; // Backward
+                }
+            });
+            sceneEl.addEventListener('touchend', () => {
+                isMoving = false;
+            });
+
+        } else {
+            keyboardHints.style.display = 'block';
+            setTimeout(() => { keyboardHints.style.opacity = '0'; }, 5000); // Fade out hint
         }
     }
     
     createMaze();
+    setupControls();
 </script>
-
 </body>
 </html>
