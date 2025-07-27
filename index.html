@@ -5,7 +5,14 @@
 <meta charset="UTF-8">
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <style>
-    body { margin: 0; }
+    body {
+        margin: 0;
+        /* --- Properties to disable text selection --- */
+        -webkit-user-select: none; /* Safari */
+        -ms-user-select: none; /* IE 10+ and Edge */
+        user-select: none; /* Standard syntax */
+        -webkit-touch-callout: none; /* Disables the callout menu on iOS */
+    }
     .a-canvas { cursor: crosshair !important; }
     #terminal-screen {
         position: fixed;
@@ -44,7 +51,6 @@
     #chat-link-btn:hover { background-color: lime; color: #000; }
     #chat-link-btn svg { width: 24px; height: 24px; margin-right: 10px; fill: currentColor; }
     
-    /* --- Styles for Mobile and Desktop Hints/Controls --- */
     #keyboard-hints {
         position: fixed;
         bottom: 20px;
@@ -57,14 +63,15 @@
         transition: opacity 1s ease-out 1s;
         display: none; 
         z-index: 10;
+        color: white; /* --- Text color set to white --- */
     }
     #mobile-controls {
         position: fixed;
         top: 0; left: 0;
         width: 100%; height: 100%;
-        display: none; /* Hidden on desktop by default */
+        display: none;
         z-index: 5;
-        pointer-events: none; /* Allows look-controls to pass through */
+        pointer-events: none;
     }
     .touch-button {
         position: absolute;
@@ -73,7 +80,7 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        pointer-events: auto; /* Buttons are clickable */
+        pointer-events: auto;
     }
     #up-arrow { top: 0; }
     #down-arrow { bottom: 0; }
@@ -157,19 +164,26 @@
                     wall.setAttribute('material', 'roughness: 0.8; metalness: 0.2');
                     mazeContainer.appendChild(wall);
                 } else if (cell === 'E') {
-                    const padlockBase = document.createElement('a-box');
-                    padlockBase.setAttribute('position', `${worldX} 2.0 ${worldZ - (SCALE / 2) + 0.1}`);
-                    padlockBase.setAttribute('scale', `${SCALE * 0.6} ${SCALE * 0.5} 0.2`);
-                    padlockBase.setAttribute('color', '#FFC107');
-                    const padlockTop = document.createElement('a-torus');
-                    padlockTop.setAttribute('position', `${worldX} 2.8 ${worldZ - (SCALE / 2) + 0.1}`);
-                    padlockTop.setAttribute('radius', `${SCALE * 0.2}`);
-                    padlockTop.setAttribute('radius-tubular', '0.1');
-                    padlockTop.setAttribute('arc', '180');
-                    padlockTop.setAttribute('rotation', '0 0 180');
-                    padlockTop.setAttribute('color', '#FFC107');
-                    mazeContainer.appendChild(padlockBase);
-                    mazeContainer.appendChild(padlockTop);
+                    // --- Updated Traditional Padlock Visual ---
+                    const padlockBody = document.createElement('a-box');
+                    padlockBody.setAttribute('position', `${worldX} 1.7 ${worldZ - (SCALE / 2) + 0.1}`);
+                    padlockBody.setAttribute('scale', `${SCALE * 0.4} ${SCALE * 0.6} 0.3`);
+                    padlockBody.setAttribute('color', '#FFC107');
+                    padlockBody.setAttribute('material', 'metalness: 0.8; roughness: 0.5');
+
+                    const padlockShackle = document.createElement('a-torus');
+                    padlockShackle.setAttribute('position', `${worldX} 2.5 ${worldZ - (SCALE / 2) + 0.1}`);
+                    padlockShackle.setAttribute('rotation', '90 0 0');
+                    padlockShackle.setAttribute('radius', `${SCALE * 0.2}`);
+                    padlockShackle.setAttribute('radius-tubular', '0.04');
+                    padlockShackle.setAttribute('arc', '180');
+                    padlockShackle.setAttribute('color', '#D4AF37');
+                    padlockShackle.setAttribute('material', 'metalness: 0.8; roughness: 0.5');
+
+                    mazeContainer.appendChild(padlockBody);
+                    mazeContainer.appendChild(padlockShackle);
+
+                    // Invisible Trigger Box
                     const trigger = document.createElement('a-box');
                     trigger.setAttribute('position', `${worldX} 1.5 ${worldZ - SCALE}`);
                     trigger.setAttribute('width', SCALE);
