@@ -43,7 +43,9 @@
     }
     #chat-link-btn:hover { background-color: lime; color: #000; }
     #chat-link-btn svg { width: 24px; height: 24px; margin-right: 10px; fill: currentColor; }
-    .hints {
+    
+    /* --- Styles for Mobile and Desktop Hints/Controls --- */
+    #keyboard-hints {
         position: fixed;
         bottom: 20px;
         left: 50%;
@@ -53,72 +55,85 @@
         border-radius: 5px;
         border: 1px solid #444;
         transition: opacity 1s ease-out 1s;
-        display: none; /* Hidden by default */
+        display: none; 
         z-index: 10;
+    }
+    #mobile-controls {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        display: none; /* Hidden on desktop by default */
+        z-index: 5;
+        pointer-events: none; /* Allows look-controls to pass through */
+    }
+    .touch-button {
+        position: absolute;
+        width: 100%;
+        height: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        pointer-events: auto; /* Buttons are clickable */
+    }
+    #up-arrow { top: 0; }
+    #down-arrow { bottom: 0; }
+    .touch-button svg {
+        width: 100px;
+        height: 100px;
+        fill: white;
+        opacity: 0.2;
     }
 </style>
 </head>
 <body>
 
-<div id="terminal-screen">
-    </div>
+<div id="terminal-screen"></div>
+<div id="keyboard-hints">Use WASD or Arrow Keys to Move | Use Mouse to Look</div>
 
-<div id="keyboard-hints" class="hints">Use WASD or Arrow Keys to Move | Use Mouse to Look</div>
-<div id="touch-hints" class="hints">Tap Top Half to Move Forward | Tap Bottom Half to Move Backward</div>
+<div id="mobile-controls">
+    <div id="up-arrow" class="touch-button">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>
+    </div>
+    <div id="down-arrow" class="touch-button">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+    </div>
+</div>
 
 <a-scene background="color: #111111">
-    
     <a-entity light="type: ambient; color: #222"></a-entity>
-
-    <a-entity id="player" position="6 1.6 6"
-              camera
-              look-controls="touchEnabled: true"
-              wasd-controls="acceleration: 120; fly: false">
+    <a-entity id="player" position="6 1.6 6" camera look-controls="touchEnabled: true" wasd-controls="acceleration: 120; fly: false">
         <a-light type="spot" angle="40" penumbra="0.4" intensity="2.0" distance="25"></a-light>
     </a-entity>
-
     <a-entity id="maze"></a-entity>
     <a-plane position="0 0 0" rotation="-90 0 0" width="100" height="100" color="#333" material="roughness: 1"></a-plane>
-    
 </a-scene>
 
 <script>
     const mazeContainer = document.getElementById('maze');
     const terminalScreen = document.getElementById('terminal-screen');
     const playerEl = document.querySelector('#player');
-    const sceneEl = document.querySelector('a-scene');
     
     const SCALE = 4;
     const WALL_HEIGHT = 5;
 
     const mazeMap = [
-        [1, 1, 1, 1, 1, 1, 1],
-        [1, 0, 0, 1, 0, 0, 1],
-        [1, 1, 0, 1, 0, 1, 1],
-        [1, 0, 0, 0, 0, 0, 1],
-        [1, 0, 1, 1, 1, 0, 1],
-        [1, 0, 0, 0, 1, 'E', 1],
-        [1, 1, 1, 1, 1, 1, 1]
+        [1, 1, 1, 1, 1, 1, 1],[1, 0, 0, 1, 0, 0, 1],[1, 1, 0, 1, 0, 1, 1],[1, 0, 0, 0, 0, 0, 1],
+        [1, 0, 1, 1, 1, 0, 1],[1, 0, 0, 0, 1, 'E', 1],[1, 1, 1, 1, 1, 1, 1]
     ];
     let isMoving = false;
-    let moveDirection = 0; // 1 for forward, -1 for backward
+    let moveDirection = 0;
 
-    // --- A-FRAME COMPONENT FOR TOUCH MOVEMENT ---
     AFRAME.registerComponent('touch-mover', {
         tick: function(time, timeDelta) {
             if (!isMoving) return;
-            
             const direction = this.el.object3D.getWorldDirection(new THREE.Vector3());
             const speed = 0.005 * timeDelta * moveDirection;
-            
             const currentPosition = this.el.getAttribute('position');
             const newPosition = {
                 x: currentPosition.x + direction.x * speed,
                 y: currentPosition.y,
                 z: currentPosition.z + direction.z * speed
             };
-            
-            // Basic collision detection check (simplified)
             const nextX = Math.round(newPosition.x / SCALE);
             const nextZ = Math.round(newPosition.z / SCALE);
             if (mazeMap[nextZ] && mazeMap[nextZ][nextX] !== 1) {
@@ -132,14 +147,12 @@
             row.forEach((cell, x) => {
                 const worldX = x * SCALE;
                 const worldZ = z * SCALE;
-
                 if (cell === 1) {
                     const wall = document.createElement('a-box');
                     wall.setAttribute('position', `${worldX} ${WALL_HEIGHT / 2} ${worldZ}`);
                     wall.setAttribute('depth', SCALE);
                     wall.setAttribute('width', SCALE);
                     wall.setAttribute('height', WALL_HEIGHT);
-                    // --- Wall color changed to dark blue ---
                     wall.setAttribute('color', '#0D47A1');
                     wall.setAttribute('material', 'roughness: 0.8; metalness: 0.2');
                     mazeContainer.appendChild(wall);
@@ -148,7 +161,6 @@
                     padlockBase.setAttribute('position', `${worldX} 2.0 ${worldZ - (SCALE / 2) + 0.1}`);
                     padlockBase.setAttribute('scale', `${SCALE * 0.6} ${SCALE * 0.5} 0.2`);
                     padlockBase.setAttribute('color', '#FFC107');
-                    
                     const padlockTop = document.createElement('a-torus');
                     padlockTop.setAttribute('position', `${worldX} 2.8 ${worldZ - (SCALE / 2) + 0.1}`);
                     padlockTop.setAttribute('radius', `${SCALE * 0.2}`);
@@ -156,10 +168,8 @@
                     padlockTop.setAttribute('arc', '180');
                     padlockTop.setAttribute('rotation', '0 0 180');
                     padlockTop.setAttribute('color', '#FFC107');
-
                     mazeContainer.appendChild(padlockBase);
                     mazeContainer.appendChild(padlockTop);
-                    
                     const trigger = document.createElement('a-box');
                     trigger.setAttribute('position', `${worldX} 1.5 ${worldZ - SCALE}`);
                     trigger.setAttribute('width', SCALE);
@@ -190,7 +200,7 @@
         if (playerEl.components['look-controls']) playerEl.components['look-controls'].pause();
         if (playerEl.components['wasd-controls']) playerEl.components['wasd-controls'].pause();
         isMoving = false;
-        
+        document.getElementById('mobile-controls').style.display = 'none';
         terminalScreen.style.display = 'flex';
         terminalScreen.innerHTML = `<div class="terminal-box"><h3>SYSTEM TERMINAL</h3><p>PASSWORD REQUIRED</p><input type="text" id="password" autofocus><button id="unlockBtn">UNLOCK</button></div>`;
         const passwordInput = document.getElementById('password');
@@ -208,33 +218,24 @@
         }
     }
     
-    // --- DEVICE AND CONTROL DETECTION ---
     function setupControls() {
         const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        const keyboardHints = document.getElementById('keyboard-hints');
-        const touchHints = document.getElementById('touch-hints');
-        
         if (isTouch) {
-            playerEl.removeAttribute('wasd-controls'); // Disable keyboard controls
-            playerEl.setAttribute('touch-mover', ''); // Enable custom touch controls
-            touchHints.style.display = 'block';
-            setTimeout(() => { touchHints.style.opacity = '0'; }, 5000); // Fade out hint
+            playerEl.removeAttribute('wasd-controls');
+            playerEl.setAttribute('touch-mover', '');
+            document.getElementById('mobile-controls').style.display = 'block';
 
-            sceneEl.addEventListener('touchstart', (e) => {
-                isMoving = true;
-                if (e.touches[0].clientY < window.innerHeight / 2) {
-                    moveDirection = 1; // Forward
-                } else {
-                    moveDirection = -1; // Backward
-                }
-            });
-            sceneEl.addEventListener('touchend', () => {
-                isMoving = false;
-            });
-
+            const upButton = document.getElementById('up-arrow');
+            const downButton = document.getElementById('down-arrow');
+            
+            upButton.addEventListener('touchstart', (e) => { e.preventDefault(); isMoving = true; moveDirection = 1; });
+            upButton.addEventListener('touchend', () => { isMoving = false; });
+            downButton.addEventListener('touchstart', (e) => { e.preventDefault(); isMoving = true; moveDirection = -1; });
+            downButton.addEventListener('touchend', () => { isMoving = false; });
         } else {
+            const keyboardHints = document.getElementById('keyboard-hints');
             keyboardHints.style.display = 'block';
-            setTimeout(() => { keyboardHints.style.opacity = '0'; }, 5000); // Fade out hint
+            setTimeout(() => { keyboardHints.style.opacity = '0'; }, 5000);
         }
     }
     
